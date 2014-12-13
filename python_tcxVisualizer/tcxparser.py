@@ -36,8 +36,12 @@ class TCXParser:
         return self.activity.Lap[-1].Track.Trackpoint[-1].Time.pyval
 
     @property
-    def distance(self):
-        return self.activity.Lap[-1].Track.Trackpoint[-2].DistanceMeters.pyval
+    def DistanceMeters(self):
+        return self.activity.Lap.DistanceMeters.pyval
+
+    @property
+    def TotalTimeSeconds(self):
+        return self.activity.Lap.TotalTimeSeconds.pyval
 
     @property
     def distance_units(self):
