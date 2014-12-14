@@ -4,7 +4,7 @@ python_tcvVisualizer
 Program for parsing tracks from endomondo (tcx files) to check if their website calculates everything correctly. Additionally a way to get familiar with Python.
 
 Details:
-http://amin-can.blogspot.com/
+http://amin-can.blogspot.com/2014/12/hackathon-numer-1111.html
 
 Credits:
  * https://github.com/vkurup/python-tcxparser - used as an example how to read the *.tcx files
