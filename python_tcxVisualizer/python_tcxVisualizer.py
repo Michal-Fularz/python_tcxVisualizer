@@ -89,6 +89,10 @@ class Data:
         totalTime = (self._timestampValues[-1] - self._timestampValues[0]).total_seconds()
         return totalTime
 
+    def GetAverageSpeedInMinPerKm(self):
+        avgSpeed = (self.GetTotoalTime() / self.GetTotalDistance()) * (1000.0/60.0)
+        return avgSpeed
+
     def GetLapTimesForRequestedDistance_C_way(self, requestedDistance):
         index = 0
         flagFinished = False
@@ -110,22 +114,23 @@ class Data:
                 flagFinished = True
         return accumulatedTime
 
-    def GetLapTimesForRequestedDistance(self, requestedDistance):
+    def GetTimeForRequestedDistance(self, requestedDistance):
         indexOfClosestElement = bisect.bisect_right(self.accumulatedDistance, requestedDistance)-1
         missingDistance = requestedDistance - self.accumulatedDistance[indexOfClosestElement]
         currentStepSpeed = self.speedInEachTick[indexOfClosestElement]
         # TODO - adde the possibility of stops during the run
-        interpolatedTime = 0
+        interpolatedTime = 0.0
         if currentStepSpeed != 0:
             interpolatedTime = missingDistance / currentStepSpeed
         return self.accumulatedTime[indexOfClosestElement] + interpolatedTime
 
-            
+    def GetLapTimeForRequestedLapDistance(self, requestedLapDistance):
+        return [self.GetTimeForRequestedDistance(x)-self.GetTimeForRequestedDistance(x-requestedLapDistance) for x in range(requestedLapDistance, 6001, requestedLapDistance)]
 
+       
 
 tcx = TCXParser("F:/Projects/VS_2013/python_tcxVisualizer/data/endomondo_altitude_test.tcx")
 tcxData = Data()
-
 
 for trackpoint in tcx.Trackpoints:
     tcxData.addNewTrackPoint(trackpoint.Position.LatitudeDegrees.pyval, trackpoint.Position.LongitudeDegrees.pyval, trackpoint.Time.pyval, trackpoint.AltitudeMeters.pyval)
@@ -140,53 +145,103 @@ print('Total time:  fromFile: ' + str(tcx.TotalTimeSeconds) + ', calculated from
 
 for item in tcxData.speedInEachTick:
     if item < 0.01:
-        print("Error")
+        print("Speed equal to 0")
+print('\n')
 
-for i in range(0, 6000, 500):
-    print(tcxData.GetLapTimesForRequestedDistance(i))
-    print('\n')
+#for i in range(500, 6000, 500):
+#    print(tcxData.GetTimeForRequestedDistance(i))
+#    print('\n')
+
+#print(tcxData.GetLapTimeForRequestedLapDistance(500))
+
+import datetime
+#print('Time for each 500m: ')
+#for item in tcxData.GetLapTimeForRequestedLapDistance(500):
+#    print(str(datetime.timedelta(seconds=item)) + ', ')
+#print('\n')
+
+# correct the way 0 is calculated... currently returning 24 cause that's the time when I started moving according to endomondo
+zeroLap = tcxData.GetTimeForRequestedDistance(0)
+print('starting delay (zero lap): ' + str(datetime.timedelta(seconds=zeroLap)))
+firstLap = tcxData.GetTimeForRequestedDistance(1000)-zeroLap
+
+endomonodoTimes = []
+endomonodoTimes.append(4*60 + 18)
+endomonodoTimes.append(4*60 + 30)
+endomonodoTimes.append(4*60 + 36)
+endomonodoTimes.append(4*60 + 35)
+endomonodoTimes.append(4*60 + 34)
+endomonodoTimes.append(4*60 + 38)
+
+print('Time for each 1000m: ')
+zipped = zip(endomonodoTimes, tcxData.GetLapTimeForRequestedLapDistance(1000))
+for tuple in zipped:
+    print('Endomonodo: ' + str(datetime.timedelta(seconds=tuple[0])) + ', calculated: ' + str(datetime.timedelta(seconds=tuple[1])))
+print('Time of rest: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(1*60+12))) + ', calculated: ' + str( datetime.timedelta(seconds=tcxData.GetTotoalTime() - tcxData.GetTimeForRequestedDistance(6000))) + '\n')
+
+
+#print('Endomono time for each 1000m: ')
+#for item in originalTimes:
+#    print(str(datetime.timedelta(seconds=item)) + ', ')
+#print('\n')
+
+mileInKm = 1.609344
+print('Times for different distances: \n')
+print('1 km: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(3*60+54))) + ', calculated: ' + str(datetime.timedelta(seconds=tcxData.GetTimeForRequestedDistance(1000))))
+print('1 mile: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(6*60+37))) + ', calculated: ' + str(datetime.timedelta(seconds=tcxData.GetTimeForRequestedDistance(1000*mileInKm))))
+print('3 km: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(13*60+0))) + ', calculated: ' + str(datetime.timedelta(seconds=tcxData.GetTimeForRequestedDistance(3000))))
+print('3 miles: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(21*60+25))) + ', calculated: ' + str(datetime.timedelta(seconds=tcxData.GetTimeForRequestedDistance(3000*mileInKm))))
+print('5 km: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(22*60+9))) + ', calculated: ' + str(datetime.timedelta(seconds=tcxData.GetTimeForRequestedDistance(5000))))
+print('Whole run: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(28*60+30))) + ', calculated: ' + str(datetime.timedelta(seconds=tcxData.GetTotoalTime())))
+print('\n')
+print('Average speed: ')
+print('Endomonodo: ' + str(datetime.timedelta(seconds=(4*60+33))) + ', calculated: ' + str(datetime.timedelta(minutes=tcxData.GetAverageSpeedInMinPerKm())) + '\n')
 
 x = np.arange(0, 256, 1)
 
 f = interp1d(x, tcxData.distanceInEachTick)
-
 x_new = np.arange(0., 255., 0.5)
 newDistance = f(x_new)
+
+x = np.arange(0, tcxData._numberOfRawDataValues, 1)
+
+plt.plot(x, tcxData._longtitudeValues, 'r')
+plt.ylabel('_longtitudeValues - red')
+plt.show()
+
+plt.plot(x, tcxData._latitudeValues, 'b')
+plt.ylabel('_latitudeValues - blue')
+plt.show()
+
+plt.plot(x, tcxData._altitudeValues, 'g')
+plt.ylabel('_altitudeValues - g')
+plt.show()
+
+x = np.arange(0, tcxData.numberOfCalculatedDataValues, 1)
 
 plt.plot(x, tcxData.distanceInEachTick, 'r', x, tcxData.timeOfEachTick, 'b')
 plt.ylabel('distance [m] - red, time [s] - blue')
 plt.show()
 
+plt.plot(x, tcxData.accumulatedDistance, 'r', x, tcxData.accumulatedTime, 'b')
+plt.ylabel('accumulated distance [m] - red, accumulated time [s] - blue')
+plt.show()
+
 plt.plot([60/(x) if x!=0 else 0 for x in tcxData.speedInEachTick])
 plt.gca().invert_yaxis()
-plt.ylabel('speed [km/min]')
+plt.ylabel('speed [min/km]')
 plt.show()
 
 plt.plot(tcxData.speedInEachTick)
 plt.ylabel('speed [km/h]')
 plt.show()
 
-
+# check the size of 0.5 of equator 
 #print(haversine(0, 0, 0, 180)/1000)
-
-namespace = 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'
-
-# http://infohost.nmt.edu/tcc/help/pubs/pylxml/web/index.html
-object = objectify.parse("F:/Projects/VS_2013/python_tcxVisualizer/data/endomondo_altitude_test.tcx")
-print(object)
-root = object.getroot()
-print(root)
-activity = root.Activities.Activity
-print(activity)
-
-activity_type = activity.attrib['Sport'].lower()
-print(activity_type)
-
-latitude = activity.Lap.Track.Trackpoint[200].Position.LatitudeDegrees.pyval
-print(latitude)
-
-
-
-
-
-print('Hello World')
